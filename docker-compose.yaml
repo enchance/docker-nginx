@@ -1,7 +1,6 @@
 version: '3.9'
 services:
-  webserver:
-    container_name: webserver
+  proxy:
     restart: always
     build:
       context: .
