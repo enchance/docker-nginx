@@ -2,9 +2,9 @@ if [ -f /root/.bash_init ]; then
     . /root/.bash_init
 fi
 
-if [ -f /root/.bash_terminal ]; then
-    . /root/.bash_terminal
-fi
+# if [ -f /root/.bash_terminal ]; then
+#     . /root/.bash_terminal
+# fi
 
 cat <<'END'
 
