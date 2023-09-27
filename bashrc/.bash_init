@@ -47,7 +47,7 @@ fixpermissions() {
     if(($# == 0))
         then
         echo "You forgot to type the path to the project folder"
-        echo && echo "    Example: 'fixpermissions /home/enchance/Dev/virtual/myproject'"
+        echo && echo "    Example: 'fixpermissions ~/myproject'"
         echo ""
         echo "Exiting..."
         return
