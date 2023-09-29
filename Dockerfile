@@ -1,4 +1,4 @@
-FROM nginx
+FROM nginx:1.25
 
 ENV NGINX_VERSION nginx-1.25.2
 
@@ -62,15 +62,12 @@ RUN ./configure \
 WORKDIR /root
 COPY ./bashrc .
 
-# WORKDIR /etc/nginx
-# COPY nginx.conf .
-# COPY servers servers
+WORKDIR /etc/nginx
+COPY nginx.conf .
+COPY servers servers
 
-# WORKDIR /app
-# COPY ./default default
-
-# WORKDIR /root
-# COPY bashrc/. .
+WORKDIR /app
+COPY default default
 
 EXPOSE 80 443
 CMD ["nginx", "-g", "daemon off;"]
