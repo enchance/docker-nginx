@@ -4,7 +4,7 @@ ENV NGINX_VERSION nginx-1.25.2
 
 RUN apt update && apt upgrade -y
 RUN set -x \
-    && apt install vim git build-essential libpcre3-dev libssl-dev zlib1g-dev libgd-dev -y
+    && apt install vim git wget cron build-essential libpcre3-dev libssl-dev zlib1g-dev libgd-dev -y
 
 WORKDIR /tmp
 COPY $NGINX_VERSION.tar.gz .
@@ -41,7 +41,6 @@ RUN ./configure \
         --with-http_ssl_module \
         --with-http_stub_status_module \
         --with-http_sub_module \
-        --with-http_v2_module --with-http_v3_module \
         --with-pcre \
         --with-http_image_filter_module=dynamic \
         --without-http_autoindex_module \
@@ -50,24 +49,43 @@ RUN ./configure \
         --with-stream_realip_module \
         --with-stream_ssl_module \
         --with-stream_ssl_preread_module \
+        --with-http_v2_module \
+        --with-http_v3_module \
+#        --with-openssl=../quiche/deps/boringssl \
+#        --with-quiche=../quiche && \
 #        --with-http_dav_module \
 #        --with-http_flv_module \
 #        --with-http_random_index_module \
 #        --with-mail_ssl_module \
-        --with-cc-opt='-g -O2 -ffile-prefix-map=/data/builder/debuild/nginx-1.25.2/debian/debuild-base/nginx-1.25.2=. -fstack-protector-strong -Wformat -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fPIC' \
-        --with-ld-opt='-Wl,-z,relro -Wl,-z,now -Wl,--as-needed -pie' \
+        --with-cc-opt='-g -O2 -ffile-prefix-map=/data/builder/debuild/nginx-1.25.2/debian/debuild-base/nginx-1.25.2=. -fstack-protector-strong -Wformat -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fPIC -I../quictls/build/include' \
+        --with-ld-opt='-Wl,-z,relro -Wl,-z,now -Wl,--as-needed -pie -L../quictls/build/lib' \
     && make \
-    && make install
+    && make install \
+    && rm -rf /build
 
 WORKDIR /root
 COPY ./bashrc .
 
 WORKDIR /etc/nginx
+RUN rm conf.d/default.conf
 COPY nginx.conf .
-COPY servers servers
+COPY sites-available sites-available
 
 WORKDIR /app
 COPY default default
 
+# Bot Blocker
+# https://github.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/tree/master
+RUN wget https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/install-ngxblocker \
+    -O /usr/local/sbin/install-ngxblocker \
+    && chmod +x /usr/local/sbin/install-ngxblocker
+WORKDIR /usr/local/sbin/
+RUN ./install-ngxblocker -x \
+    && chmod +x /usr/local/sbin/setup-ngxblocker \
+    && chmod +x /usr/local/sbin/update-ngxblocker \
+    && ./setup-ngxblocker -x -e conf
+RUN (crontab -l 2>/dev/null; echo "00 22 * * * /usr/local/sbin/update-ngxblocker") | sort - | uniq - | crontab -
+
+WORKDIR /etc/nginx
 EXPOSE 80 443
 CMD ["nginx", "-g", "daemon off;"]
