@@ -7,5 +7,5 @@ services:
       - '8080:80'
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./servers:/etc/nginx/servers
+      - ./sites-available:/etc/nginx/sites-available
       - ./default:/app/default
