@@ -71,6 +71,9 @@ RUN rm conf.d/default.conf
 COPY nginx.conf .
 COPY sites-available sites-available
 
+WORKDIR /etc/nginx/sites-enabled
+RUN ln -s /etc/nginx/sites-available/default.conf
+
 WORKDIR /app
 COPY default default
 
