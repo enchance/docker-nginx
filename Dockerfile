@@ -4,7 +4,7 @@ ENV NGINX_VERSION 1.25.2
 
 RUN apt update && apt upgrade -y
 RUN set -x \
-    && apt install vim git wget cron build-essential libpcre3-dev libssl-dev zlib1g-dev libgd-dev -y
+    && apt install vim git wget cron build-essential openssl libpcre3 libpcre3-dev libssl-dev zlib1g-dev libgd-dev -y
 
 WORKDIR /tmp
 RUN wget https://nginx.org/download/nginx-$NGINX_VERSION.tar.gz \
