@@ -1,18 +1,18 @@
 FROM nginx:1.25
 
-ENV NGINX_VERSION nginx-1.25.2
+ENV NGINX_VERSION 1.25.2
 
 RUN apt update && apt upgrade -y
 RUN set -x \
     && apt install vim git wget cron build-essential libpcre3-dev libssl-dev zlib1g-dev libgd-dev -y
 
 WORKDIR /tmp
-COPY $NGINX_VERSION.tar.gz .
-RUN tar -xvzf $NGINX_VERSION.tar.gz
+RUN wget https://nginx.org/download/nginx-$NGINX_VERSION.tar.gz \
+    && tar -xzf nginx-$NGINX_VERSION.tar.gz
 
 # https://github.com/LoicMahieu/alpine-nginx/blob/master/Dockerfile
 # https://github.com/docker/awesome-compose/tree/master
-WORKDIR /tmp/$NGINX_VERSION
+WORKDIR /tmp/nginx-$NGINX_VERSION
 RUN ./configure \
         --prefix=/etc/nginx \
         --sbin-path=/usr/sbin/nginx \
@@ -79,8 +79,7 @@ COPY default default
 
 # Bot Blocker
 # https://github.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/tree/master
-RUN wget https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/install-ngxblocker \
-    -O /usr/local/sbin/install-ngxblocker \
+RUN wget https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/install-ngxblocker -O /usr/local/sbin/install-ngxblocker \
     && chmod +x /usr/local/sbin/install-ngxblocker
 WORKDIR /usr/local/sbin/
 RUN ./install-ngxblocker -x \
