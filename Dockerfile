@@ -50,15 +50,15 @@ RUN ./configure \
         --with-stream_ssl_module \
         --with-stream_ssl_preread_module \
         --with-http_v2_module \
-        --with-http_v3_module \
+#        --with-http_v3_module \
 #        --with-openssl=../quiche/deps/boringssl \
 #        --with-quiche=../quiche && \
 #        --with-http_dav_module \
 #        --with-http_flv_module \
 #        --with-http_random_index_module \
 #        --with-mail_ssl_module \
-        --with-cc-opt='-g -O2 -ffile-prefix-map=/data/builder/debuild/nginx-1.25.2/debian/debuild-base/nginx-1.25.2=. -fstack-protector-strong -Wformat -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fPIC -I../quictls/build/include' \
-        --with-ld-opt='-Wl,-z,relro -Wl,-z,now -Wl,--as-needed -pie -L../quictls/build/lib' \
+        --with-cc-opt='-g -O2 -ffile-prefix-map=/data/builder/debuild/nginx-1.25.2/debian/debuild-base/nginx-1.25.2=. -fstack-protector-strong -Wformat -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fPIC' \
+        --with-ld-opt='-Wl,-z,relro -Wl,-z,now -Wl,--as-needed -pie' \
     && make \
     && make install \
     && rm -rf /build
@@ -73,6 +73,9 @@ COPY sites-available sites-available
 
 WORKDIR /etc/nginx/sites-enabled
 RUN ln -s /etc/nginx/sites-available/default.conf
+
+WORKDIR /etc/nginx/includes
+COPY includes .
 
 WORKDIR /app
 COPY default default
@@ -89,5 +92,5 @@ RUN ./install-ngxblocker -x \
 RUN (crontab -l 2>/dev/null; echo "00 22 * * * /usr/local/sbin/update-ngxblocker") | sort - | uniq - | crontab -
 
 WORKDIR /etc/nginx
-EXPOSE 80 443
+EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
