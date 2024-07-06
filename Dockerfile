@@ -1,6 +1,6 @@
-FROM nginx:1.25
+FROM nginx:1.27
 
-ENV NGINX_VERSION 1.25.2
+ENV NGINX_VERSION=1.27.0
 
 RUN apt update && apt upgrade -y
 RUN set -x \

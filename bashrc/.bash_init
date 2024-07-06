@@ -13,7 +13,7 @@ alias ll='ls -lF'
 alias lla='ls -lFa'
 alias la='ls -A'
 alias l='ls -CF'
-alias p='ping google.com'
+alias suod='sudo'
 
 # ---------------------------------------------------------------------------------
 # Functions
@@ -47,7 +47,7 @@ fixpermissions() {
     if(($# == 0))
         then
         echo "You forgot to type the path to the project folder"
-        echo && echo "    Example: 'fixpermissions ~/myproject'"
+        echo && echo "    Example: 'fixpermissions /home/enchance/Dev/virtual/myproject'"
         echo ""
         echo "Exiting..."
         return
