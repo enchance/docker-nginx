@@ -19,66 +19,392 @@ alias suod='sudo'
 # Functions
 # ---------------------------------------------------------------------------------
 
-verifysha1() {
-    file=$1
-    hash=$2
+verifyhash() {
+    hash_type=""
+    expected_hash=""
+    file=""
 
-    echo "$hash $file" | sha1sum -c
-}
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -t|--type)
+                hash_type=$2
+                shift 2
+                ;;
+            -h|--hash)
+                expected_hash=$2
+                shift 2
+                ;;
+            -*)
+                echo "Unknown option: $1" >&2
+                usage
+                ;;
+            *)
+                file=$1
+                shift
+                ;;
+        esac
+    done
 
-verifysha256() {
-    file=$1
-    hash=$2
+    # Check for required arguments
+    if [ -z "${hash_type}" ] || [ -z "${expected_hash}" ] || [ -z "${file}" ]; then
+        usage
+    fi
 
-    echo "$hash $file" | sha256sum -c
-}
+    # Check if file exists
+    if [ ! -f "${file}" ]; then
+        echo "Error: File not found" >&2
+        exit 1
+    fi
 
-verifymd5() {
-    file=$1
-    hash=$2
+    # Calculate the hash
+    case ${hash_type} in
+        sha1 )
+            calculated_hash=$(sha1sum "${file}" | awk '{ print $1 }')
+            ;;
+        sha256 )
+            calculated_hash=$(sha256sum "${file}" | awk '{ print $1 }')
+            ;;
+        md5 )
+            calculated_hash=$(md5sum "${file}" | awk '{ print $1 }')
+            ;;
+        * )
+            echo "Error: Unsupported hash type" >&2
+            exit 1
+            ;;
+    esac
 
-    echo "$hash $file" | md5sum -c
+    # Compare the hashes
+    if [ "${calculated_hash,,}" == "${expected_hash,,}" ]; then
+        echo "Success: Hash match"
+    else
+        echo "Failed: Wrong hash"
+    fi
+
 }
 
 # Change permissions in folder
-# $ fixpermissions FOLDER
-fixpermissions() {
-    # Check if there are any arguments
-    if(($# == 0))
-        then
-        echo "You forgot to type the path to the project folder"
-        echo && echo "    Example: 'fixpermissions /home/enchance/Dev/virtual/myproject'"
-        echo ""
-        echo "Exiting..."
-        return
+# Usage: fixpermissions [--dir DIR_PERMS] [--file FILE_PERMS] /path/to/project/folder
+fixperms() {
+    local project_path=""
+    local dir_perms="755"
+    local file_perms="644"
+    local owner=""
+    local group=""
+    local use_current_user=false
+
+    # Parse command line options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --dir)
+                dir_perms="$2"
+                shift 2
+                ;;
+            --file)
+                file_perms="$2"
+                shift 2
+                ;;
+            --owner)
+                owner="$2"
+                shift 2
+                ;;
+            --group)
+                group="$2"
+                shift 2
+                ;;
+            --me)
+                use_current_user=true
+                shift
+                ;;
+            *)
+                project_path="$1"
+                shift
+                ;;
+        esac
+    done
+
+    # Check if project path is provided
+    if [ -z "$project_path" ]; then
+        echo "Error: You forgot to provide the path to the project folder" >&2
+        echo "Usage: sudo fixperms [--dir DIR_PERMS] [--file FILE_PERMS] [--owner OWNER] [--group GROUP] [--me] /path/to/project/folder" >&2
+        return 1
     fi
 
-    sudo find $1 -type d -exec chmod 755 {} \;
-    sudo find $1 -type f -exec chmod 644 {} \;
-    return
+    # Check if the provided path exists
+    if [ ! -d "$project_path" ]; then
+        echo "Error: The specified path does not exist or is not a directory" >&2
+        return 1
+    fi
+
+    # Handle --me option
+    if $use_current_user; then
+        owner=$(whoami)
+        group=$(id -gn)
+    fi
+
+    # Validate owner and group if provided
+    if [ -n "$owner" ] && ! id "$owner" &>/dev/null; then
+        echo "Error: The specified owner '$owner' does not exist" >&2
+        return 1
+    fi
+
+    if [ -n "$group" ] && ! getent group "$group" &>/dev/null; then
+        echo "Error: The specified group '$group' does not exist" >&2
+        return 1
+    fi
+
+    # Prepare confirmation message
+    local confirm_msg="Change permissions for all files (to $file_perms) and directories (to $dir_perms)"
+    if [ -n "$owner" ]; then
+        confirm_msg+=", change owner to '$owner'"
+    fi
+    if [ -n "$group" ]; then
+        confirm_msg+=", change group to '$group'"
+    fi
+    confirm_msg+=" in '$project_path'? (y/N) "
+
+    # Ask for confirmation before proceeding
+    read -p "$confirm_msg" confirm
+    if [[ ! $confirm =~ ^[Yy]$ ]]; then
+        echo "Operation cancelled." >&2
+        return 1
+    fi
+
+    # Change permissions
+    sudo find "$project_path" -type d -exec chmod "$dir_perms" {} +
+    sudo find "$project_path" -type f -exec chmod "$file_perms" {} +
+
+    # Change ownership if specified
+    if [ -n "$owner" ] || [ -n "$group" ]; then
+        local chown_cmd="sudo chown"
+        if [ -n "$owner" ]; then
+            chown_cmd+=" $owner"
+        fi
+        if [ -n "$group" ]; then
+            chown_cmd+=":$group"
+        fi
+        chown_cmd+=" -R $project_path"
+        eval "$chown_cmd"
+    fi
+
+    echo "Permissions and ownership updated successfully."
+    return 0
 }
+
 
 # ex - archive extractor
 # usage: ex <file>
-extract()
-{
-  if [ -f $1 ] ; then
-    case $1 in
-      *.tar.bz2)   tar xjf $1   ;;
-      *.tar.gz)    tar xzf $1   ;;
-      *.bz2)       bunzip2 $1   ;;
-      *.rar)       unrar x $1     ;;
-      *.gz)        gunzip $1    ;;
-      *.tar)       tar xf $1    ;;
-      *.tbz2)      tar xjf $1   ;;
-      *.tgz)       tar xzf $1   ;;
-      *.zip)       unzip $1     ;;
-      *.Z)         uncompress $1;;
-      *.7z)        7z x $1      ;;
-      *)           echo "'$1' cannot be extracted via ex()" ;;
-    esac
-  else
-    echo "'$1' is not a valid file"
-  fi
-}
+# extract()
+# {
+#   if [ -f $1 ] ; then
+#     case $1 in
+#       *.tar.bz2)   tar xjf $1   ;;
+#       *.tar.gz)    tar xzf $1   ;;
+#       *.bz2)       bunzip2 $1   ;;
+#       *.rar)       unrar x $1     ;;
+#       *.gz)        gunzip $1    ;;
+#       *.tar)       tar xf $1    ;;
+#       *.tbz2)      tar xjf $1   ;;
+#       *.tgz)       tar xzf $1   ;;
+#       *.zip)       unzip $1     ;;
+#       *.Z)         uncompress $1;;
+#       *.7z)        7z x $1      ;;
+#       *)           echo "'$1' cannot be extracted via ex()" ;;
+#     esac
+#   else
+#     echo "'$1' is not a valid file"
+#   fi
+# }
+#!/bin/bash
 
+extract() {
+    local recursive=false
+    local delete=false
+    local verbose=false
+    local dry_run=false
+    local formats=()
+
+    # Check for required tools
+    local required_tools=("tar" "unzip" "7z" "unrar")
+    local missing_tools=()
+    for tool in "${required_tools[@]}"; do
+        if ! command -v "$tool" &> /dev/null; then
+            missing_tools+=("$tool")
+        fi
+    done
+
+    if [ ${#missing_tools[@]} -ne 0 ]; then
+        echo "Warning: The following required tools are missing: ${missing_tools[*]}"
+        echo "Some archive types may not be extractable."
+    fi
+
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -r|--recursive) recursive=true ;;
+            -d|--delete) delete=true ;;
+            -v|--verbose) verbose=true ;;
+            --dry-run) dry_run=true ;;
+            -f|--format)
+                IFS=',' read -ra formats <<< "$2"
+                shift
+                ;;
+            *) break ;;
+        esac
+        shift
+    done
+
+    if [[ ! -e $1 ]]; then
+        echo "Error: '$1' does not exist."
+        return 1
+    fi
+
+    if [[ -d $1 && ${#formats[@]} -eq 0 ]]; then
+        echo "Error: Please specify formats with -f or --format when processing a directory."
+        return 1
+    fi
+
+    # Check if specified formats are supported
+    for format in "${formats[@]}"; do
+        case $format in
+            tar|gz|tgz|bz2|tbz2|xz|txz)
+                if ! command -v tar &> /dev/null; then
+                    echo "Warning: tar is not installed. $format files will be skipped."
+                fi
+                ;;
+            zip)
+                if ! command -v unzip &> /dev/null; then
+                    echo "Warning: unzip is not installed. zip files will be skipped."
+                fi
+                ;;
+            7z)
+                if ! command -v 7z &> /dev/null; then
+                    echo "Warning: 7z is not installed. 7z files will be skipped."
+                fi
+                ;;
+            rar)
+                if ! command -v unrar &> /dev/null; then
+                    echo "Warning: unrar is not installed. rar files will be skipped."
+                fi
+                ;;
+        esac
+    done
+
+    process_item() {
+        local item=$1
+        if [[ -f $item ]]; then
+            process_file "$item"
+        elif [[ -d $item ]]; then
+            process_directory "$item"
+        fi
+    }
+
+    process_directory() {
+        local dir=$1
+        local depth_arg="-maxdepth 1"
+        [[ $recursive == true ]] && depth_arg=""
+
+        for format in "${formats[@]}"; do
+            find "$dir" $depth_arg -type f -name "*.$format" -print0 |
+            while IFS= read -r -d '' file; do
+                process_file "$file"
+            done
+        done
+    }
+
+    process_file() {
+        local file=$1
+        local ext=${file##*.}
+        local filename=$(basename "$file")
+        local dirname=$(dirname "$file")
+
+        if [[ $verbose == true ]]; then
+            echo "Processing: $file"
+        fi
+
+        if [[ $dry_run == true ]]; then
+            echo "[DRY RUN] Would extract $file to $dirname"
+            return
+        fi
+
+        if ! extract_archive "$file" "$dirname"; then
+            echo -e "\e[31mError extracting $file\e[0m"
+            return 1
+        fi
+
+        if [[ $delete == true ]]; then
+            rm "$file" && echo "Deleted: $file"
+        fi
+    }
+
+    extract_archive() {
+        local file=$1
+        local extract_dir=$2
+        local filename=$(basename "$file")
+        local name_without_ext=${filename%.*}
+        local temp_dir=$(mktemp -d)
+        local single_folder=""
+
+        # Set up trap to clean up temporary directory
+        trap 'rm -rf "$temp_dir"' EXIT
+
+        case ${file##*.} in
+            tar)     tar xf "$file" -C "$temp_dir" ;;
+            gz|tgz)  tar xzf "$file" -C "$temp_dir" ;;
+            bz2|tbz2) tar xjf "$file" -C "$temp_dir" ;;
+            xz|txz)  tar xJf "$file" -C "$temp_dir" ;;
+            zip)     unzip "$file" -d "$temp_dir" ;;
+            7z)      7z x "$file" -o"$temp_dir" ;;
+            rar)     unrar x -r "$file" "$temp_dir" ;;
+            *)       rm -rf "$temp_dir"; return 1 ;;
+        esac
+
+        # Check if archive contains only one top-level folder
+        single_folder=$(ls -d "$temp_dir"/* 2>/dev/null | wc -l)
+        if [[ $single_folder -eq 1 && -d "$temp_dir"/* ]]; then
+            single_folder=$(basename "$temp_dir"/*)
+            if [[ $single_folder == $name_without_ext ]]; then
+                mv "$temp_dir"/"$single_folder"/* "$temp_dir"/
+                rmdir "$temp_dir"/"$single_folder"
+                single_folder=""
+            fi
+        else
+            single_folder=""
+        fi
+
+        local target_dir="$extract_dir/$name_without_ext"
+        if [[ -n $single_folder ]]; then
+            target_dir="$extract_dir/$single_folder"
+        fi
+
+        # Only add hash if the target directory already exists
+        if [[ -d $target_dir ]]; then
+            target_dir="${target_dir}_$(mktemp -u XXXXXX)"
+        fi
+
+        if ! mkdir -p "$target_dir" 2>/dev/null; then
+            echo "Permission error: Cannot create directory $target_dir"
+            rm -rf "$temp_dir"
+            return 1
+        fi
+
+        if ! mv "$temp_dir"/* "$target_dir" 2>/dev/null; then
+            echo "Permission error: Cannot move files to $target_dir"
+            rm -rf "$temp_dir"
+            return 1
+        fi
+
+        rm -rf "$temp_dir"
+
+        if [[ $verbose == true ]]; then
+            echo "Extracted files:"
+            find "$target_dir" -type f -print0 | xargs -0 -I {} echo "  {}"
+        fi
+    }
+
+    if [[ -d $1 ]]; then
+        process_directory "$1"
+    else
+        process_file "$1"
+    fi
+}
