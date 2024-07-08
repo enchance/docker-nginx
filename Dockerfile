@@ -89,7 +89,7 @@ RUN ./install-ngxblocker -x \
     && chmod +x /usr/local/sbin/setup-ngxblocker \
     && chmod +x /usr/local/sbin/update-ngxblocker \
     && ./setup-ngxblocker -x -e conf
-RUN (crontab -l 2>/dev/null; echo "00 22 * * * /usr/local/sbin/update-ngxblocker") | sort - | uniq - | crontab -
+#RUN (crontab -l 2>/dev/null; echo "00 22 * * * /usr/local/sbin/update-ngxblocker") | sort - | uniq - | crontab -
 
 WORKDIR /etc/nginx
 EXPOSE 80

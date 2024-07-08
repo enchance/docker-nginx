@@ -3,4 +3,4 @@
 .gitignore
 .dockerignore
 Dockerfile
-docker-compose-dev.yaml
+docker-compose.yaml
