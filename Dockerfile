@@ -1,10 +1,9 @@
 FROM nginx:1.27
 
-ENV NGINX_VERSION=1.27.0
-
 RUN apt update && apt upgrade -y
 RUN set -x \
-    && apt install vim git wget cron build-essential openssl libpcre3 libpcre3-dev libssl-dev zlib1g-dev libgd-dev -y
+    && apt install vim git wget tree cron \
+        build-essential openssl libpcre3 libpcre3-dev libssl-dev zlib1g-dev libgd-dev -y
 
 WORKDIR /tmp
 RUN wget https://nginx.org/download/nginx-$NGINX_VERSION.tar.gz \
@@ -16,7 +15,7 @@ WORKDIR /tmp/nginx-$NGINX_VERSION
 RUN ./configure \
         --prefix=/etc/nginx \
         --sbin-path=/usr/sbin/nginx \
-        --modules-path=/usr/lib/nginx/modules \
+        --modules-path=/etc/nginx/modules \
         --conf-path=/etc/nginx/nginx.conf \
         --error-log-path=/var/log/nginx/error.log --http-log-path=/var/log/nginx/access.log \
         --pid-path=/var/run/nginx.pid \
@@ -57,11 +56,28 @@ RUN ./configure \
 #        --with-http_flv_module \
 #        --with-http_random_index_module \
 #        --with-mail_ssl_module \
-        --with-cc-opt='-g -O2 -ffile-prefix-map=/data/builder/debuild/nginx-1.25.2/debian/debuild-base/nginx-1.25.2=. -fstack-protector-strong -Wformat -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fPIC' \
+        --with-cc-opt='-g -O2 -ffile-prefix-map=/data/builder/debuild/nginx-${NGINX_VERSION}/debian/debuild-base/nginx-${NGINX_VERSION}=. -fstack-protector-strong -Wformat -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fPIC' \
         --with-ld-opt='-Wl,-z,relro -Wl,-z,now -Wl,--as-needed -pie' \
     && make \
     && make install \
     && rm -rf /build
+
+WORKDIR /etc/nginx/includes
+COPY includes .
+
+# Bot Blocker
+# https://github.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/tree/master
+RUN wget https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/install-ngxblocker -O /usr/local/sbin/install-ngxblocker \
+    && chmod +x /usr/local/sbin/install-ngxblocker
+WORKDIR /usr/local/sbin/
+RUN ./install-ngxblocker -x \
+    && chmod +x /usr/local/sbin/setup-ngxblocker \
+    && chmod +x /usr/local/sbin/update-ngxblocker \
+    && ./setup-ngxblocker -x -e conf
+
+# Run this in your project image
+#RUN (crontab -l 2>/dev/null; echo "00 22 * * * /usr/local/sbin/update-ngxblocker" -e $YOUR_EMAIL) \
+#    | sort - | uniq - | crontab -
 
 WORKDIR /root
 COPY ./bashrc .
@@ -74,22 +90,8 @@ COPY sites-available sites-available
 WORKDIR /etc/nginx/sites-enabled
 RUN ln -s /etc/nginx/sites-available/default.conf
 
-WORKDIR /etc/nginx/includes
-COPY includes .
-
 WORKDIR /app
 COPY default default
-
-# Bot Blocker
-# https://github.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/tree/master
-RUN wget https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/install-ngxblocker -O /usr/local/sbin/install-ngxblocker \
-    && chmod +x /usr/local/sbin/install-ngxblocker
-WORKDIR /usr/local/sbin/
-RUN ./install-ngxblocker -x \
-    && chmod +x /usr/local/sbin/setup-ngxblocker \
-    && chmod +x /usr/local/sbin/update-ngxblocker \
-    && ./setup-ngxblocker -x -e conf
-#RUN (crontab -l 2>/dev/null; echo "00 22 * * * /usr/local/sbin/update-ngxblocker") | sort - | uniq - | crontab -
 
 WORKDIR /etc/nginx
 EXPOSE 80
